@@ -308,6 +308,10 @@ void bmdma_cmd_writeb(BMDMAState *bm, uint32_t val)
              * whole DMA operation will be submitted to disk with a single
              * aio operation with preadv/pwritev.
              */
+#ifdef CONFIG_ATAPI_PT
+            /* TODO: Why? Are we sure this is safe? */
+            bmdma_cancel(bm);
+#endif
             if (bm->bus->dma->aiocb) {
                 bdrv_drain_all();
                 assert(bm->bus->dma->aiocb == NULL);

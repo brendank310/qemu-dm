@@ -32,6 +32,9 @@
 
 #define PCI_CLASS_SYSTEM_OTHER           0x0880
 
+/* XenClient: xenmou */
+#define PCI_CLASS_INPUT_DEVICE           0x0980
+
 #define PCI_CLASS_SERIAL_USB             0x0c03
 #define PCI_CLASS_SERIAL_SMBUS           0x0c05
 
@@ -144,6 +147,8 @@
 
 #define PCI_VENDOR_ID_XEN               0x5853
 #define PCI_DEVICE_ID_XEN_PLATFORM      0x0001
+/* XenClient: xenmou */
+#define PCI_DEVICE_ID_XENMOU            0xc110
 
 #define PCI_VENDOR_ID_NEC                0x1033
 #define PCI_DEVICE_ID_NEC_UPD720200      0x0194

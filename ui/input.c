@@ -447,6 +447,30 @@ void kbd_mouse_event(int dx, int dy, int dz, int buttons_state)
     }
 }
 
+void kbd_mouse_event_absolute(int x, int y, int dz, int buttons_state)
+{
+    QEMUPutMouseEntry *entry;
+    QEMUPutMouseEvent *mouse_event;
+    void *mouse_event_opaque;
+
+    if (!runstate_is_running() && !runstate_check(RUN_STATE_SUSPENDED)) {
+        return;
+    }
+
+    if (!kbd_mouse_is_absolute()) {
+        return;
+    }
+
+    entry = QTAILQ_FIRST(&mouse_handlers);
+
+    mouse_event = entry->qemu_put_mouse_event;
+    mouse_event_opaque = entry->qemu_put_mouse_event_opaque;
+
+    if (mouse_event && entry->qemu_put_mouse_event_absolute) {
+        mouse_event(mouse_event_opaque, x, y, dz, buttons_state);
+    }
+}
+
 int kbd_mouse_is_absolute(void)
 {
     if (QTAILQ_EMPTY(&mouse_handlers)) {

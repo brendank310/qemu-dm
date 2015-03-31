@@ -430,4 +430,8 @@ int64_t pow2floor(int64_t value);
 int uleb128_encode_small(uint8_t *out, uint32_t n);
 int uleb128_decode_small(const uint8_t *in, uint32_t *n);
 
+#ifdef CONFIG_SYSLOG_LOGGING
+#include "logging.h"
+#endif
+
 #endif

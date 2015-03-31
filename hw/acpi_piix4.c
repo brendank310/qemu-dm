@@ -30,6 +30,12 @@
 #include "fw_cfg.h"
 #include "exec/address-spaces.h"
 
+/* XenClient: acpi */
+#include "xen.h" /* xen_enabled */
+
+/* XenClient: battery */
+#include "xen_battery.h" /* xen_battery_init */
+
 //#define DEBUG
 
 #ifdef DEBUG
@@ -392,8 +398,19 @@ static int piix4_pm_initfn(PCIDevice *dev)
     pci_conf[0x09] = 0x00;
     pci_conf[0x3d] = 0x01; // interrupt pin 1
 
-    /* APM */
-    apm_init(dev, &s->apm, apm_ctrl_changed, s);
+    /* XenClient: battery
+     * APM or the battery if needed */
+    if (!xen_enabled()) {
+        apm_init(dev, &s->apm, apm_ctrl_changed, s);
+    } else {
+        if (xen_battery_get_option()) {
+            xen_battery_init(dev);
+        }
+    }
+
+    /* XenClient: acpi
+     * Enable ACPI, QEMU doesn't enable it by default */
+    apm_ctrl_changed(ACPI_ENABLE, s);
 
     if (s->kvm_enabled) {
         /* Mark SMM as already inited to prevent SMM from running.  KVM does not
@@ -429,6 +446,7 @@ static int piix4_pm_initfn(PCIDevice *dev)
     qemu_register_reset(piix4_reset, s);
 
     piix4_acpi_system_hot_add_init(pci_address_space_io(dev), dev->bus, s);
+
 
     return 0;
 }

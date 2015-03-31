@@ -204,6 +204,12 @@ struct BlockDriver {
      */
     int (*bdrv_has_zero_init)(BlockDriverState *bs);
 
+#ifdef CONFIG_ATAPI_PT
+    int (*bdrv_set_device_state)(BlockDriverState *bs,
+                                            uint32_t const cmd);
+    int (*bdrv_get_device_state)(BlockDriverState *bs,
+                                    uint32_t const cmd, uint32_t *data);
+#endif
     QLIST_ENTRY(BlockDriver) list;
 };
 

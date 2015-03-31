@@ -242,7 +242,10 @@ void ide_atapi_cmd_reply_end(IDEState *s)
 }
 
 /* send a reply of 'size' bytes in s->io_buffer to an ATAPI command */
-static void ide_atapi_cmd_reply(IDEState *s, int size, int max_size)
+#ifndef CONFIG_ATAPI_PT
+static
+#endif
+void ide_atapi_cmd_reply(IDEState *s, int size, int max_size)
 {
     if (size > max_size)
         size = max_size;

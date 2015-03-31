@@ -18,11 +18,24 @@
  * Contributions after 2012-01-13 are licensed under the terms of the
  * GNU GPL, version 2 or (at your option) any later version.
  */
+/* XenClient: acpi
+ * add status messages */
+#ifdef CONFIG_SYSLOG_LOGGING
+# include "logging.h"
+#else
+# include "stdio.h"
+#endif
+
 #include "sysemu/sysemu.h"
 #include "hw.h"
 #include "pc.h"
 #include "acpi.h"
 #include "monitor/monitor.h"
+
+
+/* XenClient:
+ * needed for 'xenstore_update_power' */
+#include "xen.h"
 
 struct acpi_table_header {
     uint16_t _length;         /* our length, not actual part of the hdr */
@@ -40,6 +53,16 @@ struct acpi_table_header {
 
 #define ACPI_TABLE_HDR_SIZE sizeof(struct acpi_table_header)
 #define ACPI_TABLE_PFX_SIZE sizeof(uint16_t)  /* size of the extra prefix */
+
+/* XenClient: acpi */
+/* Sleep state type codes as defined by the \_Sx objects in the DSDT. */
+/* These must be kept in sync with the DSDT (hvmloader/acpi/dsdt.asl) */
+#define SLP_TYP_S4_V0     (6)
+#define SLP_TYP_S3_V0     (5)
+#define SLP_TYP_S5_V0     (7)
+#define SLP_TYP_S4_V1     (0)
+#define SLP_TYP_S3_V1     (1)
+#define SLP_TYP_S5_V1     (0)
 
 static const char dfl_hdr[ACPI_TABLE_HDR_SIZE] =
     "\0\0"                   /* fake _length (2) */
@@ -421,20 +444,33 @@ static void acpi_pm1_cnt_write(ACPIREGS *ar, uint16_t val)
 {
     ar->pm1.cnt.cnt = val & ~(ACPI_BITMASK_SLEEP_ENABLE);
 
+    /* XenClient: acpi */
     if (val & ACPI_BITMASK_SLEEP_ENABLE) {
         /* change suspend type */
         uint16_t sus_typ = (val >> 10) & 7;
         switch(sus_typ) {
-        case 0: /* soft power off */
-            qemu_system_shutdown_request();
-            break;
-        case 1:
+        case SLP_TYP_S3_V0: /* S3: Suspend to RAM: Sleep */
+            /* Same code for V0 and V1 */
+        case SLP_TYP_S3_V1:
             qemu_system_suspend_request();
+            xenstore_update_power(XENSTORE_PM_TYPE_SLEEP);
+            break;
+        case SLP_TYP_S4_V0: /* S4: Suspend to disk: Hibernation */
+            monitor_protocol_event(QEVENT_SUSPEND_DISK, NULL);
+            qemu_system_shutdown_request();
+            xenstore_update_power(XENSTORE_PM_TYPE_HIBERNATE);
+            break;
+        case SLP_TYP_S5_V0: /* S5: Shutdown */
+            /* Same code for V0 and V1 */
+        case SLP_TYP_S5_V1:
+            qemu_system_shutdown_request();
+            xenstore_update_power(XENSTORE_PM_TYPE_SHUTDOWN);
             break;
         default:
             if (sus_typ == ar->pm1.cnt.s4_val) { /* S4 request */
                 monitor_protocol_event(QEVENT_SUSPEND_DISK, NULL);
                 qemu_system_shutdown_request();
+                xenstore_update_power(XENSTORE_PM_TYPE_HIBERNATE);
             }
             break;
         }

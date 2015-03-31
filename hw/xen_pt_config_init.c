@@ -1354,6 +1354,7 @@ static XenPTRegInfo xen_pt_emu_reg_msi[] = {
  * MSI-X Capability
  */
 
+#ifndef CONFIG_XENPT_HIDE_MSIX
 /* Message Control register for MSI-X */
 static int xen_pt_msixctrl_reg_init(XenPCIPassthroughState *s,
                                     XenPTRegInfo *reg, uint32_t real_offset,
@@ -1437,6 +1438,7 @@ static XenPTRegInfo xen_pt_emu_reg_msix[] = {
         .size = 0,
     },
 };
+#endif  /* CONFIG_XENPT_HIDE_MSIX */
 
 
 /****************************
@@ -1557,6 +1559,8 @@ static int xen_pt_msi_size_init(XenPCIPassthroughState *s,
     *size = msi_size;
     return 0;
 }
+
+#ifndef CONFIG_XENPT_HIDE_MSIX
 /* get MSI-X Capability Structure register group size */
 static int xen_pt_msix_size_init(XenPCIPassthroughState *s,
                                  const XenPTRegGroupInfo *grp_reg,
@@ -1574,6 +1578,7 @@ static int xen_pt_msix_size_init(XenPCIPassthroughState *s,
     *size = grp_reg->grp_size;
     return 0;
 }
+#endif  /* CONFIG_XENPT_HIDE_MSIX */
 
 
 static const XenPTRegGroupInfo xen_pt_emu_reg_grps[] = {
@@ -1667,6 +1672,7 @@ static const XenPTRegGroupInfo xen_pt_emu_reg_grps[] = {
         .size_init   = xen_pt_pcie_size_init,
         .emu_regs = xen_pt_emu_reg_pcie,
     },
+#ifndef CONFIG_XENPT_HIDE_MSIX
     /* MSI-X Capability Structure reg group */
     {
         .grp_id      = PCI_CAP_ID_MSIX,
@@ -1675,6 +1681,7 @@ static const XenPTRegGroupInfo xen_pt_emu_reg_grps[] = {
         .size_init   = xen_pt_msix_size_init,
         .emu_regs = xen_pt_emu_reg_msix,
     },
+#endif /* CONFIG_XENPT_HIDE_MSIX */
     {
         .grp_size = 0,
     },

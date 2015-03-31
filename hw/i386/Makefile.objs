@@ -14,4 +14,7 @@ obj-y += kvm/
 obj-$(CONFIG_SPICE) += qxl.o qxl-logger.o qxl-render.o
 obj-y += pc-testdev.o
 
+# XenClient: xenmou
+obj-$(CONFIG_XEN) += xenmou.o
+
 obj-y := $(addprefix ../,$(obj-y))

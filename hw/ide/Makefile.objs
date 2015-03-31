@@ -8,3 +8,4 @@ common-obj-$(CONFIG_IDE_MACIO) += macio.o
 common-obj-$(CONFIG_IDE_VIA) += via.o
 common-obj-$(CONFIG_AHCI) += ahci.o
 common-obj-$(CONFIG_AHCI) += ich.o
+common-obj-$(CONFIG_ATAPI_PT) += atapi_pt.o

@@ -99,6 +99,10 @@ common-obj-y += qom/
 common-obj-y += disas/
 
 ######################################################################
+# loggin-syslog
+common-obj-$(CONFIG_SYSLOG_LOGGING) += logging.o
+
+######################################################################
 # guest agent
 
 # FIXME: a few definitions from qapi-types.o/qapi-visit.o are needed

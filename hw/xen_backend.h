@@ -104,4 +104,11 @@ int xen_config_dev_vfb(int vdev, const char *type);
 int xen_config_dev_vkbd(int vdev);
 int xen_config_dev_console(int vdev);
 
+/* generic xenstore extensions */
+int xenstore_generic_init(void);
+int xenstore_rm(const char *base, const char *node);
+typedef void (*xenstore_watch_cb_t)(void*);
+int xenstore_add_watch(const char *base, const char *node,
+                       xenstore_watch_cb_t cb, void *opaque);
+
 #endif /* QEMU_HW_XEN_BACKEND_H */

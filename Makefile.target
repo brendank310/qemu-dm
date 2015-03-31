@@ -121,6 +121,7 @@ LIBS+=-lz
 
 # xen support
 obj-$(CONFIG_XEN) += xen-all.o xen-mapcache.o
+obj-$(CONFIG_XEN) += xen-dmbus.o
 obj-$(CONFIG_NO_XEN) += xen-stub.o
 
 # Hardware support

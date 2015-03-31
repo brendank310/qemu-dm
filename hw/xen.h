@@ -54,9 +54,24 @@ void xen_modified_memory(ram_addr_t start, ram_addr_t length);
 
 struct MemoryRegion;
 void xen_register_framebuffer(struct MemoryRegion *mr);
+struct MemoryRegion *xen_get_framebuffer(void);
+void * xen_get_framebuffer_ptr(void);
 
 #if defined(CONFIG_XEN) && CONFIG_XEN_CTRL_INTERFACE_VERSION < 400
 #  define HVM_MAX_VCPUS 32
 #endif
+
+/* Xenclient:
+ * Power Management */
+enum xenstore_pm_type {
+  XENSTORE_PM_TYPE_REBOOT = 0,
+  XENSTORE_PM_TYPE_SLEEP = 3,
+  XENSTORE_PM_TYPE_HIBERNATE = 4,
+  XENSTORE_PM_TYPE_SHUTDOWN = 5
+};
+
+int xenstore_update_power(enum xenstore_pm_type const type);
+bool xenstore_is_32bpp_only(void);
+bool xenstore_is_legacy_res_only(void);
 
 #endif /* QEMU_HW_XEN_H */

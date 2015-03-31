@@ -45,8 +45,17 @@
 #define VBE_DISPI_INDEX_VIRT_HEIGHT     0x7
 #define VBE_DISPI_INDEX_X_OFFSET        0x8
 #define VBE_DISPI_INDEX_Y_OFFSET        0x9
-#define VBE_DISPI_INDEX_NB              0xa /* size of vbe_regs[] */
+#define VBE_DISPI_INDEX_NB              0xa  /* size of vbe_regs[] */
 #define VBE_DISPI_INDEX_VIDEO_MEMORY_64K 0xa /* read-only, not in vbe_regs */
+
+#define VBE_DISPI_EXT_INDEX_START           0xd
+#define VBE_DISPI_EXT_INDEX_STRIDE          (VBE_DISPI_EXT_INDEX_START + 0x0) /* 0xd */
+#define VBE_DISPI_EXT_INDEX_NB              0x1 /* size of vbe_ext_regs[] */
+#define VBE_DISPI_EXT_INDEX_EDID_XRES       (VBE_DISPI_EXT_INDEX_START + 0x1) /* 0xe -- read-only, not in vbe_regs */
+#define VBE_DISPI_EXT_INDEX_EDID_YRES       (VBE_DISPI_EXT_INDEX_START + 0x2) /* 0xf -- read-only, not in vbe_regs */
+#define VBE_DISPI_EXT_INDEX_STRIDE_ALIGN    (VBE_DISPI_EXT_INDEX_START + 0x3) /* 0x10 -- read-only, not in vbe_regs */
+#define VBE_DISPI_EXT_INDEX_32BPP_ONLY      (VBE_DISPI_EXT_INDEX_START + 0x4) /* 0x11 -- read-only, not in vbe_regs */
+#define VBE_DISPI_EXT_INDEX_LEGACY_RES_ONLY (VBE_DISPI_EXT_INDEX_START + 0x5) /* 0x12 -- read-only, not in vbe_regs */
 
 #define VBE_DISPI_ID0                   0xB0C0
 #define VBE_DISPI_ID1                   0xB0C1
@@ -66,6 +75,11 @@
 
 #define CH_ATTR_SIZE (160 * 100)
 #define VGA_MAX_HEIGHT 2048
+
+#define VGA_OXT_BASE			0x3800
+#define VGA_OXT_SPINLOCK		VGA_OXT_BASE
+#define VGA_OXT_SHADOW_BDA_BASE		(VGA_OXT_BASE + 0x2)
+#define VGA_OXT_SHADOW_BDA_SIZE		0x38
 
 struct vga_precise_retrace {
     int64_t ticks_per_char;
@@ -127,6 +141,7 @@ typedef struct VGACommonState {
     /* bochs vbe state */
     uint16_t vbe_index;
     uint16_t vbe_regs[VBE_DISPI_INDEX_NB];
+    uint16_t vbe_ext_regs[VBE_DISPI_EXT_INDEX_NB];
     uint32_t vbe_start_addr;
     uint32_t vbe_line_offset;
     uint32_t vbe_bank_mask;
@@ -170,6 +185,10 @@ typedef struct VGACommonState {
     vga_update_retrace_info_fn update_retrace_info;
     union vga_retrace retrace_info;
     uint8_t is_vbe_vmstate;
+    /* ioport spinlock */
+    bool locked;
+    /* shadow BDA */
+    uint8_t shadow_bda[VGA_OXT_SHADOW_BDA_SIZE];
 } VGACommonState;
 
 static inline int c6_to_8(int v)

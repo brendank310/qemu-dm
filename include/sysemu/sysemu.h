@@ -90,6 +90,7 @@ typedef enum DisplayType
     DT_CURSES,
     DT_SDL,
     DT_NOGRAPHIC,
+    DT_SURFMAN,
     DT_NONE,
 } DisplayType;
 
@@ -103,6 +104,7 @@ typedef enum {
 extern int vga_interface_type;
 #define xenfb_enabled (vga_interface_type == VGA_XENFB)
 #define qxl_enabled (vga_interface_type == VGA_QXL)
+#define xt_enabled (vga_interface_type == VGA_XT)
 
 extern int graphic_width;
 extern int graphic_height;

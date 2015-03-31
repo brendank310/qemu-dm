@@ -1399,8 +1399,13 @@ void ide_exec_cmd(IDEBus *bus, uint32_t val)
         s->status = READY_STAT | SEEK_STAT;
         s->atapi_dma = s->feature & 1;
         s->nsector = 1;
+
         ide_transfer_start(s, s->io_buffer, ATAPI_PACKET_SIZE,
+#ifdef CONFIG_ATAPI_PT
+                           s->atapi_pt ? atapi_pt_cmd : ide_atapi_cmd);
+#else
                            ide_atapi_cmd);
+#endif
         break;
     /* CF-ATA commands */
     case CFA_REQ_EXT_ERROR_CODE:
@@ -1765,7 +1770,12 @@ void ide_cmd_write(void *opaque, uint32_t addr, uint32_t val)
 static bool ide_is_pio_out(IDEState *s)
 {
     if (s->end_transfer_func == ide_sector_write ||
-        s->end_transfer_func == ide_atapi_cmd) {
+        s->end_transfer_func == ide_atapi_cmd
+#ifdef CONFIG_ATAPI_PT
+        || s->end_transfer_func == atapi_pt_cmd ||
+           s->end_transfer_func == atapi_pt_dout_fetch_pio_done
+#endif
+        ) {
         return false;
     } else if (s->end_transfer_func == ide_sector_read ||
                s->end_transfer_func == ide_transfer_stop ||
@@ -1976,6 +1986,12 @@ int ide_init_drive(IDEState *s, BlockDriverState *bs, IDEDriveKind kind,
     uint64_t nb_sectors;
 
     s->bs = bs;
+#ifdef CONFIG_ATAPI_PT
+    if (kind == IDE_CD_PT) { 
+        kind = IDE_CD;
+        s->atapi_pt = true;
+    }
+#endif
     s->drive_kind = kind;
 
     bdrv_get_geometry(bs, &nb_sectors);
@@ -2015,7 +2031,19 @@ int ide_init_drive(IDEState *s, BlockDriverState *bs, IDEDriveKind kind,
     } else {
         switch (kind) {
         case IDE_CD:
-            strcpy(s->drive_model_str, "QEMU DVD-ROM");
+#ifdef CONFIG_ATAPI_PT
+            if (s->atapi_pt) {
+                strcpy(s->drive_model_str, "QEMU DVD PT");
+                if (0 != atapi_pt_init(s)) {
+                    error_report("Can't use a direst Pass Through drive");
+                    return -1;
+                }
+            } else {
+#endif
+                strcpy(s->drive_model_str, "QEMU DVD-ROM");
+#ifdef CONFIG_ATAPI_PT
+            }
+#endif
             break;
         case IDE_CFATA:
             strcpy(s->drive_model_str, "QEMU MICRODRIVE");
@@ -2047,9 +2075,14 @@ static void ide_init1(IDEBus *bus, int unit)
     s->drive_serial = drive_serial++;
     /* we need at least 2k alignment for accessing CDROMs using O_DIRECT */
     s->io_buffer_total_len = IDE_DMA_BUF_SECTORS*512 + 4;
+#ifdef CONFIG_ATAPI_PT
+    /* TODO: why double the buffer size?? */
+    s->io_buffer = qemu_memalign(2048, s->io_buffer_total_len * 2);
+    memset(s->io_buffer, 0, s->io_buffer_total_len * 2);
+#else
     s->io_buffer = qemu_memalign(2048, s->io_buffer_total_len);
     memset(s->io_buffer, 0, s->io_buffer_total_len);
-
+#endif
     s->smart_selftest_data = qemu_blockalign(s->bs, 512);
     memset(s->smart_selftest_data, 0, 512);
 
@@ -2191,6 +2224,10 @@ static EndTransferFunc* transfer_end_table[] = {
         ide_atapi_cmd_reply_end,
         ide_atapi_cmd,
         ide_dummy_transfer_stop,
+#ifdef CONFIG_ATAPI_PT
+        atapi_pt_cmd,
+        atapi_pt_dout_fetch_pio_done,
+#endif
 };
 
 static int transfer_end_table_idx(EndTransferFunc *fn)

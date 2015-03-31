@@ -26,6 +26,10 @@ struct EventNotifier {
     int rfd;
     int wfd;
 #endif
+
+#ifdef CONFIG_ATAPI_PT
+    void *opaque;
+#endif
 };
 
 typedef void EventNotifierHandler(EventNotifier *);
@@ -39,6 +43,7 @@ int event_notifier_set_handler(EventNotifier *, EventNotifierHandler *);
 #ifdef CONFIG_POSIX
 void event_notifier_init_fd(EventNotifier *, int fd);
 int event_notifier_get_fd(EventNotifier *);
+int event_notifier_wait_and_clear(EventNotifier *e, long second);
 #else
 HANDLE event_notifier_get_handle(EventNotifier *);
 #endif

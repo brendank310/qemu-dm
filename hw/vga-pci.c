@@ -196,6 +196,8 @@ static void vga_class_init(ObjectClass *klass, void *data)
     k->vendor_id = PCI_VENDOR_ID_QEMU;
     k->device_id = PCI_DEVICE_ID_QEMU_VGA;
     k->class_id = PCI_CLASS_DISPLAY_VGA;
+    k->subsystem_vendor_id = PCI_VENDOR_ID_XEN;
+    k->subsystem_id = 0x0001;
     dc->vmsd = &vmstate_vga_pci;
     dc->props = vga_pci_properties;
 }

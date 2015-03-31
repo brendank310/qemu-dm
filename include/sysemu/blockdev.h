@@ -26,6 +26,9 @@ typedef enum {
     IF_IDE = 0,
     IF_NONE,
     IF_SCSI, IF_FLOPPY, IF_PFLASH, IF_MTD, IF_SD, IF_VIRTIO, IF_XEN,
+#ifdef CONFIG_ATAPI_PT
+    IF_ATAPI_PT,
+#endif
     IF_COUNT
 } BlockInterfaceType;
 
@@ -43,6 +46,9 @@ struct DriveInfo {
     const char *serial;
     QTAILQ_ENTRY(DriveInfo) next;
     int refcount;
+#ifdef CONFIG_ATAPI_PT
+    bool atapi_pt;
+#endif
 };
 
 DriveInfo *drive_get(BlockInterfaceType type, int bus, int unit);

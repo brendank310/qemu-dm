@@ -59,6 +59,7 @@ void qemu_remove_led_event_handler(QEMUPutLEDEntry *entry);
 void kbd_put_keycode(int keycode);
 void kbd_put_ledstate(int ledstate);
 void kbd_mouse_event(int dx, int dy, int dz, int buttons_state);
+void kbd_mouse_event_absolute(int x, int y, int dz, int buttons_state);
 
 /* Does the current mouse generate absolute events */
 int kbd_mouse_is_absolute(void);
@@ -165,6 +166,9 @@ struct DisplayChangeListener {
 
     void (*dpy_mouse_set)(struct DisplayState *s, int x, int y, int on);
     void (*dpy_cursor_define)(struct DisplayState *s, QEMUCursor *cursor);
+
+    void (*dpy_get_display_limits)(struct DisplayState *s, unsigned int *width, unsigned int *height,
+                                   unsigned int *stride_alignment);
 
     QLIST_ENTRY(DisplayChangeListener) next;
 };
@@ -349,6 +353,28 @@ static inline bool dpy_cursor_define_supported(struct DisplayState *s)
     return false;
 }
 
+static inline void dpy_get_display_limits(struct DisplayState *s, unsigned int *width, unsigned int *height,
+                                          unsigned int *stride_alignment)
+{
+    struct DisplayChangeListener *dcl;
+    unsigned int w, h, a;
+
+    *width = 1920;
+    *height = 1200;
+    *stride_alignment = 1;  /* HACK: Keep the biggest supported resolution and the smallest required stride alignment. */
+    QLIST_FOREACH(dcl, &s->listeners, next) {
+        if (dcl->dpy_get_display_limits) {
+            dcl->dpy_get_display_limits(s, &w, &h, &a);
+            if ((*width > w) || (*height > h)) {
+                *width = w;
+                *height = h;
+	    }
+            if (*stride_alignment < a)
+                *stride_alignment = a;
+        }
+    }
+}
+
 static inline int ds_get_linesize(DisplayState *ds)
 {
     return pixman_image_get_stride(ds->surface->image);
@@ -473,6 +499,11 @@ static inline int vnc_display_pw_expire(DisplayState *ds, time_t expires)
 {
     return -ENODEV;
 };
+#endif
+
+#ifdef CONFIG_SURFMAN
+/* surfman.c */
+void surfman_display_init(DisplayState *ds);
 #endif
 
 /* curses.c */

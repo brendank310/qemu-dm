@@ -195,6 +195,7 @@ common-obj-$(CONFIG_BRLAPI) += baum.o
 # xen backend driver support
 common-obj-$(CONFIG_XEN_BACKEND) += xen_backend.o xen_devconfig.o
 common-obj-$(CONFIG_XEN_BACKEND) += xen_console.o xenfb.o xen_disk.o xen_nic.o
+obj-$(CONFIG_XEN) += xen_battery.o
 
 # Per-target files
 # virtio has to be here due to weird dependency between PCI and virtio-net.

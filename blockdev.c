@@ -33,6 +33,9 @@ static const char *const if_name[IF_COUNT] = {
     [IF_SD] = "sd",
     [IF_VIRTIO] = "virtio",
     [IF_XEN] = "xen",
+#ifdef CONFIG_ATAPI_PT
+    [IF_ATAPI_PT] = "atapi-pt",
+#endif
 };
 
 static const int if_max_devs[IF_COUNT] = {
@@ -282,6 +285,9 @@ DriveInfo *drive_init(QemuOpts *opts, BlockInterfaceType block_default_type)
     const char *serial;
     const char *mediastr = "";
     BlockInterfaceType type;
+#ifdef CONFIG_ATAPI_PT
+    bool atapi_pt = false;
+#endif
     enum { MEDIA_DISK, MEDIA_CDROM } media;
     int bus_id, unit_id;
     int cyls, heads, secs, translation;
@@ -328,6 +334,13 @@ DriveInfo *drive_init(QemuOpts *opts, BlockInterfaceType block_default_type)
         type = block_default_type;
     }
 
+#ifdef CONFIG_ATAPI_PT
+    if (IF_ATAPI_PT == type) { 
+        type = IF_IDE;
+        atapi_pt = true;
+        ro = 0;
+    }
+#endif
     max_devs = if_max_devs[type];
 
     if (cyls || heads || secs) {
@@ -555,11 +568,19 @@ DriveInfo *drive_init(QemuOpts *opts, BlockInterfaceType block_default_type)
     bdrv_set_io_limits(dinfo->bdrv, &io_limits);
 
     switch(type) {
+#ifdef CONFIG_ATAPI_PT
+    case IF_ATAPI_PT:
+#endif
     case IF_IDE:
     case IF_SCSI:
     case IF_XEN:
     case IF_NONE:
         dinfo->media_cd = media == MEDIA_CDROM;
+#ifdef CONFIG_ATAPI_PT
+        if (atapi_pt) {
+            dinfo->atapi_pt = true;
+        }
+#endif
         break;
     case IF_SD:
     case IF_FLOPPY:

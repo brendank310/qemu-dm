@@ -1676,15 +1676,17 @@ PixelFormat qemu_default_pixelformat(int bpp)
             pf.bbits = 5;
             break;
         case 16:
-            pf.rmask = 0x0000F800;
+            //Modification for OpenXT: select BGR565 as the default, instead of
+            //RGB565, as Surfman supports BGR565, but doesn't support RGB565.
+            pf.rmask = 0x0000001F;
             pf.gmask = 0x000007E0;
-            pf.bmask = 0x0000001F;
+            pf.bmask = 0x0000F800;
             pf.rmax = 31;
             pf.gmax = 63;
             pf.bmax = 31;
-            pf.rshift = 11;
+            pf.rshift = 0;
             pf.gshift = 5;
-            pf.bshift = 0;
+            pf.bshift = 11;
             pf.rbits = 5;
             pf.gbits = 6;
             pf.bbits = 5;

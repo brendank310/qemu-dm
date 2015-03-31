@@ -41,6 +41,9 @@
 
 #include <xen/grant_table.h>
 
+#include "ui/xen-input.h"
+#include "xen-dmbus.h"
+
 /* ------------------------------------------------------------- */
 
 /* public */
@@ -658,6 +661,10 @@ static void xenstore_update(void *unused)
     if (sscanf(vec[XS_WATCH_TOKEN], "fe:%" PRIxPTR, &ptr) == 1) {
         xenstore_update_fe(vec[XS_WATCH_PATH], (void*)ptr);
     }
+    if (sscanf(vec[XS_WATCH_TOKEN], "cb:%" PRIxPTR ":%" PRIxPTR,
+               &ptr, &ops) == 2) {
+        ((xenstore_watch_cb_t)ptr)((void *)ops);
+    }
 
 cleanup:
     free(vec);
@@ -685,7 +692,11 @@ static void xen_be_evtchn_event(void *opaque)
 
 int xen_be_init(void)
 {
-    xenstore = xs_daemon_open();
+    /* xenstore_generic_init() may have already opened xenstore */
+    if (!xenstore) {
+        xenstore = xs_daemon_open();
+    }
+
     if (!xenstore) {
         xen_be_printf(NULL, 0, "can't connect to xenstored\n");
         return -1;
@@ -785,3 +796,116 @@ void xen_be_printf(struct XenDevice *xendev, int msg_level, const char *fmt, ...
     }
     qemu_log_flush();
 }
+
+/**
+ * Removes specific xenstore key (base/node)
+ * @returns 0 on success, -1 otherwise.
+ */
+int xenstore_rm(const char *base, const char *node)
+{
+    char abspath[XEN_BUFSIZE];
+
+    snprintf(abspath, sizeof(abspath), "%s/%s", base, node);
+    if (!xs_rm(xenstore, 0, abspath)) {
+        return -1;
+    }
+    return 0;
+}
+
+/**
+ * Registers a xenstore watch for specificed callback and optional pointer.
+ * @returns 0 on success, -1 otherwise.
+ */
+int xenstore_add_watch(const char *base, const char *node,
+                        xenstore_watch_cb_t cb, void *opaque)
+{
+    char abspath[XEN_BUFSIZE];
+    char token[XEN_BUFSIZE];
+
+    snprintf(abspath, sizeof(abspath), "%s/%s", base, node);
+    xen_be_printf(NULL, 1, "xenstore_add_watch: %s\n", abspath);
+
+    /* xs_watch copies this token and xenstore_update() parses it on event */
+    snprintf(token, sizeof(token), "cb:%p:%p", cb, opaque);
+    xen_be_printf(NULL, 1, "xenstore_add_watch: %s - %s\n", abspath, token);
+
+    if (!xs_watch(xenstore, abspath, token)) {
+         xen_be_printf(NULL, 1, "xenstore_add_watch: failed watch for %s\n",
+                       abspath);
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * Open xenstore to support basic xenstore ops before xen_be_init() is invoked.
+ * @returns 0 on success, -1 otherwise.
+ */
+int xenstore_generic_init(void)
+{
+    if (!xenstore) {
+        xen_be_printf(NULL, 1, "xenstore_basic_init: opening xenstore\n");
+        xenstore = xs_daemon_open();
+        if (!xenstore) {
+            xen_be_printf(NULL, 0, "xenstore_basic_init: failed to open xs\n");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+/****************************************************
+ * XenClient: Power Management */
+
+/* XenClient:
+ * Power Management Notification */
+int xenstore_update_power(enum xenstore_pm_type const type)
+{
+    char *dompath = NULL;
+
+    dompath = xs_get_domain_path(xenstore, xen_domid);
+
+    if (NULL == dompath) {
+        return -1;
+    }
+
+    xen_input_send_shutdown(type);
+
+    return xenstore_write_int(dompath, "power-state", type);
+}
+
+
+/****************************************************
+ * XenClient: VBE exstentions. */
+bool xenstore_is_32bpp_only(void)
+{
+    char *domain_path;
+    int val;
+
+    domain_path = xs_get_domain_path(xenstore, xen_domid);
+    if (!domain_path) {
+        return false;
+    }
+    if (xenstore_read_int(domain_path, "platform/restrictdisplaydepth", &val)) {
+        return false;
+    }
+    return (val == 32);
+}
+
+bool xenstore_is_legacy_res_only(void)
+{
+    char *domain_path;
+    int val;
+
+    domain_path = xs_get_domain_path(xenstore, xen_domid);
+    if (!domain_path) {
+        return false;
+    }
+    if (xenstore_read_int(domain_path, "platform/restrictdisplayres", &val)) {
+        return false;
+    }
+    return !!val;
+}
+

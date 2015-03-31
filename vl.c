@@ -169,6 +169,11 @@ int main(int argc, char **argv)
 
 #include "ui/qemu-spice.h"
 #include "qapi/string-input-visitor.h"
+#include "ui/xen-input.h"
+
+/* XenClient: battery
+ * Use to set the battery emulation device */
+#include "hw/xen_battery.h"
 
 //#define DEBUG_NET
 //#define DEBUG_SLIRP
@@ -181,7 +186,7 @@ int main(int argc, char **argv)
 static const char *data_dir;
 const char *bios_name = NULL;
 enum vga_retrace_method vga_retrace_method = VGA_RETRACE_DUMB;
-DisplayType display_type = DT_DEFAULT;
+DisplayType display_type;
 static int display_remote;
 const char* keyboard_layout = NULL;
 ram_addr_t ram_size;
@@ -2206,6 +2211,13 @@ static DisplayType select_display(const char *p)
         fprintf(stderr, "Curses support is disabled\n");
         exit(1);
 #endif
+    } else if (strstart(p, "surfman", &opts)) {
+#ifdef CONFIG_SURFMAN
+        display = DT_SURFMAN;
+#else
+        fprintf(stderr, "Surfman support is disabled\n");
+        exit(1);
+#endif
     } else if (strstart(p, "none", &opts)) {
         display = DT_NONE;
     } else {
@@ -3646,6 +3658,10 @@ int main(int argc, char **argv, char **envp)
                 break;
             case QEMU_OPTION_name:
                 qemu_name = g_strdup(optarg);
+                /* XenClient: logging-syslog */
+#ifdef CONFIG_SYSLOG_LOGGING
+                logging_set_prefix(qemu_name);
+#endif
 		 {
 		     char *p = strchr(qemu_name, ',');
 		     if (p != NULL) {
@@ -3728,6 +3744,16 @@ int main(int argc, char **argv, char **envp)
                     exit(1);
                 }
                 xen_mode = XEN_ATTACH;
+                break;
+            case QEMU_OPTION_xenbattery:
+                /* XenClient: battery
+                 * Use the XenClient emulated battery */
+                if (!(xen_available())) {
+                    printf("Option %s not supported for this target\n",
+                           popt->name);
+                    exit(1);
+                }
+                xen_battery_set_option(1);
                 break;
             case QEMU_OPTION_trace:
             {
@@ -4249,6 +4275,12 @@ int main(int argc, char **argv, char **envp)
 #elif defined(CONFIG_COCOA)
     case DT_SDL:
         cocoa_display_init(ds, full_screen);
+        break;
+#endif
+#if defined(CONFIG_SURFMAN)
+    case DT_SURFMAN:
+        xen_input_init();
+        surfman_display_init(ds);
         break;
 #endif
     default:

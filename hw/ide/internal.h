@@ -316,7 +316,11 @@ typedef struct IDEDMAOps IDEDMAOps;
 #define SMART_DISABLE         0xd9
 #define SMART_STATUS          0xda
 
-typedef enum { IDE_HD, IDE_CD, IDE_CFATA } IDEDriveKind;
+typedef enum { IDE_HD, IDE_CD, IDE_CFATA, 
+#ifdef CONFIG_ATAPI_PT
+IDE_CD_PT,
+#endif
+} IDEDriveKind;
 
 typedef void EndTransferFunc(IDEState *);
 
@@ -338,6 +342,11 @@ enum ide_dma_cmd {
 
 #define ide_cmd_is_read(s) \
 	((s)->dma_cmd == IDE_DMA_READ)
+
+
+#ifdef CONFIG_ATAPI_PT
+#include "hw/ide/atapi_pt.h"
+#endif
 
 /* NOTE: IDEState represents in fact one drive */
 struct IDEState {
@@ -382,6 +391,10 @@ struct IDEState {
     bool tray_open;
     bool tray_locked;
     uint8_t cdrom_changed;
+#ifdef CONFIG_ATAPI_PT
+    bool atapi_pt;
+    ATAPIPassThroughState *atapipts;
+#endif
     int packet_transfer_size;
     int elementary_transfer_size;
     int io_buffer_index;
@@ -536,6 +549,9 @@ void ide_dma_error(IDEState *s);
 void ide_atapi_cmd_ok(IDEState *s);
 void ide_atapi_cmd_error(IDEState *s, int sense_key, int asc);
 void ide_atapi_io_error(IDEState *s, int ret);
+#ifdef CONFIG_ATAPI_PT
+void ide_atapi_cmd_reply(IDEState *s, int size, int max_size);
+#endif
 
 void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val);
 uint32_t ide_ioport_read(void *opaque, uint32_t addr1);

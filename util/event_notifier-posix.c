@@ -119,3 +119,41 @@ int event_notifier_test_and_clear(EventNotifier *e)
 
     return value;
 }
+
+#ifdef CONFIG_ATAPI_PT
+int event_notifier_wait_and_clear(EventNotifier *e, long second)
+{
+    fd_set rfds;
+    int value;
+    struct timeval tv;
+    struct timeval *tvp;
+
+    if (second != 0) {
+        tv.tv_sec = second;
+        tv.tv_usec = 0;
+        tvp = &tv;
+    } else {
+        tvp = NULL;
+    }
+
+    FD_ZERO(&rfds);
+    FD_SET(e->rfd, &rfds);
+
+    value = select(e->rfd + 1, &rfds, NULL, NULL, tvp);
+
+    switch (value) {
+    case -1:
+        value = -errno;
+        break;
+    case 1:
+        event_notifier_test_and_clear(e);
+        break;
+    case 0:
+    default:
+        value = 0;
+        break;
+    }
+
+    return value;
+}
+#endif
