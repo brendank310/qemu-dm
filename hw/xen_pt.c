@@ -180,23 +180,23 @@ static uint32_t xen_pt_pci_read_config(PCIDevice *d, uint32_t addr, int len)
 
             /* do emulation based on register size */
             switch (reg->size) {
-            case 1:
-                if (reg->u.b.read) {
-                    rc = reg->u.b.read(s, reg_entry, ptr_val, valid_mask);
-                }
-                break;
-            case 2:
-                if (reg->u.w.read) {
-                    rc = reg->u.w.read(s, reg_entry,
-                                       (uint16_t *)ptr_val, valid_mask);
-                }
-                break;
-            case 4:
-                if (reg->u.dw.read) {
-                    rc = reg->u.dw.read(s, reg_entry,
-                                        (uint32_t *)ptr_val, valid_mask);
-                }
-                break;
+                case 1:
+                    if (reg->u.b.read) {
+                        rc = reg->u.b.read(s, reg_entry, ptr_val, valid_mask);
+                    }
+                    break;
+                case 2:
+                    if (reg->u.w.read) {
+                        rc = reg->u.w.read(s, reg_entry,
+                                           (uint16_t *)ptr_val, valid_mask);
+                    }
+                    break;
+                case 4:
+                    if (reg->u.dw.read) {
+                        rc = reg->u.dw.read(s, reg_entry,
+                                            (uint32_t *)ptr_val, valid_mask);
+                    }
+                    break;
             }
 
             if (rc < 0) {
@@ -301,27 +301,27 @@ static void xen_pt_pci_write_config(PCIDevice *d, uint32_t addr,
 
             /* do emulation based on register size */
             switch (reg->size) {
-            case 1:
-                if (reg->u.b.write) {
-                    rc = reg->u.b.write(s, reg_entry, ptr_val,
-                                        read_val >> ((real_offset & 3) << 3),
-                                        valid_mask);
-                }
-                break;
-            case 2:
-                if (reg->u.w.write) {
-                    rc = reg->u.w.write(s, reg_entry, (uint16_t *)ptr_val,
-                                        (read_val >> ((real_offset & 3) << 3)),
-                                        valid_mask);
-                }
-                break;
-            case 4:
-                if (reg->u.dw.write) {
-                    rc = reg->u.dw.write(s, reg_entry, (uint32_t *)ptr_val,
-                                         (read_val >> ((real_offset & 3) << 3)),
-                                         valid_mask);
-                }
-                break;
+                case 1:
+                    if (reg->u.b.write) {
+                        rc = reg->u.b.write(s, reg_entry, ptr_val,
+                                            read_val >> ((real_offset & 3) << 3),
+                                            valid_mask);
+                    }
+                    break;
+                case 2:
+                    if (reg->u.w.write) {
+                        rc = reg->u.w.write(s, reg_entry, (uint16_t *)ptr_val,
+                                            (read_val >> ((real_offset & 3) << 3)),
+                                            valid_mask);
+                    }
+                    break;
+                case 4:
+                    if (reg->u.dw.write) {
+                        rc = reg->u.dw.write(s, reg_entry, (uint32_t *)ptr_val,
+                                             (read_val >> ((real_offset & 3) << 3)),
+                                             valid_mask);
+                    }
+                    break;
             }
 
             if (rc < 0) {
@@ -388,6 +388,12 @@ static const MemoryRegionOps ops = {
     .write = xen_pt_bar_write,
 };
 
+static const MemoryRegionOps ati_ops = {
+    .endianness = DEVICE_NATIVE_ENDIAN,
+    .read = xen_pt_ati_legacy_read,
+    .write = xen_pt_ati_legacy_write,
+};
+
 static int xen_pt_register_regions(XenPCIPassthroughState *s)
 {
     int i = 0;
@@ -416,6 +422,14 @@ static int xen_pt_register_regions(XenPCIPassthroughState *s)
             }
         }
 
+        // check for an ATI card that we may want to add some quirks too
+        // see the legacy-ioemu patch ati-pt.patch for details, along with
+        // what KVM does:
+        // https://github.com/qemu/qemu/commit/7076eabcbf38d514ecd47c8190d3d162573ceacc
+        if(d->vendor_id == 0x1002) {
+            fprintf(stderr, "AMD/ATI card detected");
+        }
+
         memory_region_init_io(&s->bar[i], &ops, &s->dev,
                               "xen-pci-pt-bar", r->size);
         pci_register_bar(&s->dev, i, type, &s->bar[i]);
@@ -423,6 +437,9 @@ static int xen_pt_register_regions(XenPCIPassthroughState *s)
         XEN_PT_LOG(&s->dev, "IO region %i registered (size=0x%lx"PRIx64
                    " base_addr=0x%lx"PRIx64" type: %#x)\n",
                    i, r->size, r->base_addr, type);
+        fprintf(stderr, "IO region %i registered (size=0x%lx"PRIx64
+                " base_addr=0x%lx"PRIx64" type: %#x)\n",
+                i, r->size, r->base_addr, type);
     }
 
     /* Register expansion ROM address */
@@ -587,7 +604,7 @@ static void xen_pt_region_update(XenPCIPassthroughState *s,
     } else {
         pcibus_t guest_addr = sec->offset_within_address_space;
         pcibus_t machine_addr = s->bases[bar].access.maddr
-            + sec->offset_within_region;
+                                + sec->offset_within_region;
         pcibus_t size = sec->size;
         rc = xc_domain_memory_mapping(xen_xc, xen_domid,
                                       XEN_PFN(guest_addr + XC_PAGE_SIZE - 1),
@@ -604,7 +621,7 @@ static void xen_pt_region_update(XenPCIPassthroughState *s,
 static void xen_pt_region_add(MemoryListener *l, MemoryRegionSection *sec)
 {
     XenPCIPassthroughState *s = container_of(l, XenPCIPassthroughState,
-                                             memory_listener);
+                                memory_listener);
 
     xen_pt_region_update(s, sec, true);
 }
@@ -612,7 +629,7 @@ static void xen_pt_region_add(MemoryListener *l, MemoryRegionSection *sec)
 static void xen_pt_region_del(MemoryListener *l, MemoryRegionSection *sec)
 {
     XenPCIPassthroughState *s = container_of(l, XenPCIPassthroughState,
-                                             memory_listener);
+                                memory_listener);
 
     xen_pt_region_update(s, sec, false);
 }
@@ -620,7 +637,7 @@ static void xen_pt_region_del(MemoryListener *l, MemoryRegionSection *sec)
 static void xen_pt_io_region_add(MemoryListener *l, MemoryRegionSection *sec)
 {
     XenPCIPassthroughState *s = container_of(l, XenPCIPassthroughState,
-                                             io_listener);
+                                io_listener);
 
     xen_pt_region_update(s, sec, true);
 }
@@ -628,7 +645,7 @@ static void xen_pt_io_region_add(MemoryListener *l, MemoryRegionSection *sec)
 static void xen_pt_io_region_del(MemoryListener *l, MemoryRegionSection *sec)
 {
     XenPCIPassthroughState *s = container_of(l, XenPCIPassthroughState,
-                                             io_listener);
+                                io_listener);
 
     xen_pt_region_update(s, sec, false);
 }
