@@ -26,6 +26,11 @@
 #include <xen/hvm/params.h>
 #include <xen/hvm/e820.h>
 
+#ifdef CONFIG_XEN_ISO_CHANGE
+#include "xen-changeiso.h"
+#endif
+
+
 //#define DEBUG_XEN
 
 #ifdef DEBUG_XEN
@@ -50,7 +55,7 @@ static MemoryRegion ram_memory, ram_640k, ram_lo, ram_hi;
  * mapped with the correct caching attributes.
  **/
 static MemoryRegion *framebuffer;
-static void * framebuffer_mapped;
+static void *framebuffer_mapped;
 
 static bool xen_in_migration;
 
@@ -221,7 +226,7 @@ void xen_ram_alloc(ram_addr_t ram_addr, ram_addr_t size, MemoryRegion *mr)
         /* RAM already populated in Xen */
         fprintf(stderr, "%s: do not alloc "RAM_ADDR_FMT
                 " bytes of ram at "RAM_ADDR_FMT" when runstate is INMIGRATE\n",
-                __func__, size, ram_addr); 
+                __func__, size, ram_addr);
         return;
     }
 
@@ -261,7 +266,7 @@ static XenPhysmap *get_physmapping(XenIOState *state,
 }
 
 static hwaddr xen_phys_offset_to_gaddr(hwaddr start_addr,
-                                                   ram_addr_t size, void *opaque)
+                                       ram_addr_t size, void *opaque)
 {
     hwaddr addr = start_addr & TARGET_PAGE_MASK;
     XenIOState *xen_io_state = opaque;
@@ -343,23 +348,23 @@ go_physmap:
                                    XEN_DOMCTL_MEM_CACHEATTR_WC);
 
     snprintf(path, sizeof(path),
-            "/local/domain/0/device-model/%d/physmap/%"PRIx64"/start_addr",
-            xen_domid, (uint64_t)phys_offset);
+             "/local/domain/0/device-model/%d/physmap/%"PRIx64"/start_addr",
+             xen_domid, (uint64_t)phys_offset);
     snprintf(value, sizeof(value), "%"PRIx64, (uint64_t)start_addr);
     if (!xs_write(state->xenstore, 0, path, value, strlen(value))) {
         return -1;
     }
     snprintf(path, sizeof(path),
-            "/local/domain/0/device-model/%d/physmap/%"PRIx64"/size",
-            xen_domid, (uint64_t)phys_offset);
+             "/local/domain/0/device-model/%d/physmap/%"PRIx64"/size",
+             xen_domid, (uint64_t)phys_offset);
     snprintf(value, sizeof(value), "%"PRIx64, (uint64_t)size);
     if (!xs_write(state->xenstore, 0, path, value, strlen(value))) {
         return -1;
     }
     if (mr->name) {
         snprintf(path, sizeof(path),
-                "/local/domain/0/device-model/%d/physmap/%"PRIx64"/name",
-                xen_domid, (uint64_t)phys_offset);
+                 "/local/domain/0/device-model/%d/physmap/%"PRIx64"/name",
+                 xen_domid, (uint64_t)phys_offset);
         if (!xs_write(state->xenstore, 0, path, mr->name, strlen(mr->name))) {
             return -1;
         }
@@ -644,7 +649,7 @@ static ioreq_t *cpu_get_ioreq(XenIOState *state)
     port = xc_evtchn_pending(state->xce_handle);
     if (port == state->bufioreq_local_port) {
         qemu_mod_timer(state->buffered_io_timer,
-                BUFFER_IO_MAX_DELAY + qemu_get_clock_ms(rt_clock));
+                       BUFFER_IO_MAX_DELAY + qemu_get_clock_ms(rt_clock));
         return NULL;
     }
 
@@ -686,7 +691,7 @@ static uint32_t do_inp(pio_addr_t addr, unsigned long size)
 }
 
 static void do_outp(pio_addr_t addr,
-        unsigned long size, uint32_t val)
+                    unsigned long size, uint32_t val)
 {
     switch (size) {
         case 1:
@@ -799,7 +804,7 @@ static void cpu_ioreq_move(ioreq_t *req)
 static void handle_ioreq(ioreq_t *req)
 {
     if (!req->data_is_ptr && (req->dir == IOREQ_WRITE) &&
-            (req->size < sizeof (target_ulong))) {
+        (req->size < sizeof (target_ulong))) {
         req->data &= ((target_ulong) 1 << (8 * req->size)) - 1;
     }
 
@@ -834,7 +839,7 @@ static int handle_buffered_iopage(XenIOState *state)
 
     while (state->buffered_io_page->read_pointer != state->buffered_io_page->write_pointer) {
         buf_req = &state->buffered_io_page->buf_ioreq[
-            state->buffered_io_page->read_pointer % IOREQ_BUFFER_SLOT_NUM];
+                      state->buffered_io_page->read_pointer % IOREQ_BUFFER_SLOT_NUM];
         req.size = 1UL << buf_req->size;
         req.count = 1;
         req.addr = buf_req->addr;
@@ -847,7 +852,7 @@ static int handle_buffered_iopage(XenIOState *state)
         qw = (req.size == 8);
         if (qw) {
             buf_req = &state->buffered_io_page->buf_ioreq[
-                (state->buffered_io_page->read_pointer + 1) % IOREQ_BUFFER_SLOT_NUM];
+                          (state->buffered_io_page->read_pointer + 1) % IOREQ_BUFFER_SLOT_NUM];
             req.data |= ((uint64_t)buf_req->data) << 32;
         }
 
@@ -866,7 +871,7 @@ static void handle_buffered_io(void *opaque)
 
     if (handle_buffered_iopage(state)) {
         qemu_mod_timer(state->buffered_io_timer,
-                BUFFER_IO_MAX_DELAY + qemu_get_clock_ms(rt_clock));
+                       BUFFER_IO_MAX_DELAY + qemu_get_clock_ms(rt_clock));
     } else {
         qemu_del_timer(state->buffered_io_timer);
         xc_evtchn_unmask(state->xce_handle, state->bufioreq_local_port);
@@ -942,7 +947,7 @@ static int store_dev_info(int domid, CharDriverState *cs, const char *string)
         goto out;
     }
     newpath = realloc(path, (strlen(path) + strlen(string) +
-                strlen("/tty") + 1));
+                             strlen("/tty") + 1));
     if (newpath == NULL) {
         fprintf(stderr, "realloc error\n");
         goto out;
@@ -1000,7 +1005,7 @@ static void xen_main_loop_prepare(XenIOState *state)
     }
 
     state->buffered_io_timer = qemu_new_timer_ms(rt_clock, handle_buffered_io,
-                                                 state);
+                               state);
 
     if (evtchn_fd != -1) {
         qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, state);
@@ -1020,7 +1025,7 @@ static void xen_change_state_handler(void *opaque, int running,
 }
 
 static void xen_hvm_change_state_handler(void *opaque, int running,
-                                         RunState rstate)
+        RunState rstate)
 {
     XenIOState *xstate = opaque;
     if (running) {
@@ -1056,7 +1061,7 @@ static void xen_read_physmap(XenIOState *state)
     char **entries = NULL;
 
     snprintf(path, sizeof(path),
-            "/local/domain/0/device-model/%d/physmap", xen_domid);
+             "/local/domain/0/device-model/%d/physmap", xen_domid);
     entries = xs_directory(state->xenstore, 0, path, &num);
     if (entries == NULL)
         return;
@@ -1065,8 +1070,8 @@ static void xen_read_physmap(XenIOState *state)
         physmap = g_malloc(sizeof (XenPhysmap));
         physmap->phys_offset = strtoull(entries[i], NULL, 16);
         snprintf(path, sizeof(path),
-                "/local/domain/0/device-model/%d/physmap/%s/start_addr",
-                xen_domid, entries[i]);
+                 "/local/domain/0/device-model/%d/physmap/%s/start_addr",
+                 xen_domid, entries[i]);
         value = xs_read(state->xenstore, 0, path, &len);
         if (value == NULL) {
             free(physmap);
@@ -1076,8 +1081,8 @@ static void xen_read_physmap(XenIOState *state)
         free(value);
 
         snprintf(path, sizeof(path),
-                "/local/domain/0/device-model/%d/physmap/%s/size",
-                xen_domid, entries[i]);
+                 "/local/domain/0/device-model/%d/physmap/%s/size",
+                 xen_domid, entries[i]);
         value = xs_read(state->xenstore, 0, path, &len);
         if (value == NULL) {
             free(physmap);
@@ -1087,8 +1092,8 @@ static void xen_read_physmap(XenIOState *state)
         free(value);
 
         snprintf(path, sizeof(path),
-                "/local/domain/0/device-model/%d/physmap/%s/name",
-                xen_domid, entries[i]);
+                 "/local/domain/0/device-model/%d/physmap/%s/name",
+                 xen_domid, entries[i]);
         physmap->name = xs_read(state->xenstore, 0, path, &len);
 
         QLIST_INSERT_HEAD(&state->physmap, physmap, list);
@@ -1123,15 +1128,15 @@ int xen_hvm_init(void)
     state->suspend.notify = xen_suspend_notifier;
     qemu_register_suspend_notifier(&state->suspend);
 
-    // We need to tell the hypervisor what the domid of the device model is. 
-    // Usually, it's expecting dom0, but with a stubdomain, that is not the 
+    // We need to tell the hypervisor what the domid of the device model is.
+    // Usually, it's expecting dom0, but with a stubdomain, that is not the
     // case
     xc_set_hvm_param(xen_xc, xen_domid, HVM_PARAM_DM_DOMAIN, DOMID_SELF);
 
     xc_get_hvm_param(xen_xc, xen_domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
     DPRINTF("shared page at pfn %lx\n", ioreq_pfn);
     state->shared_page = xc_map_foreign_range(xen_xc, xen_domid, XC_PAGE_SIZE,
-                                              PROT_READ|PROT_WRITE, ioreq_pfn);
+                         PROT_READ | PROT_WRITE, ioreq_pfn);
     if (state->shared_page == NULL) {
         hw_error("map shared IO page returned error %d handle=" XC_INTERFACE_FMT,
                  errno, xen_xc);
@@ -1140,7 +1145,7 @@ int xen_hvm_init(void)
     xc_get_hvm_param(xen_xc, xen_domid, HVM_PARAM_BUFIOREQ_PFN, &ioreq_pfn);
     DPRINTF("buffered io page at pfn %lx\n", ioreq_pfn);
     state->buffered_io_page = xc_map_foreign_range(xen_xc, xen_domid, XC_PAGE_SIZE,
-                                                   PROT_READ|PROT_WRITE, ioreq_pfn);
+                              PROT_READ | PROT_WRITE, ioreq_pfn);
     if (state->buffered_io_page == NULL) {
         hw_error("map buffered IO page returned error %d", errno);
     }
@@ -1159,13 +1164,13 @@ int xen_hvm_init(void)
     }
 
     rc = xc_get_hvm_param(xen_xc, xen_domid, HVM_PARAM_BUFIOREQ_EVTCHN,
-            &bufioreq_evtchn);
+                          &bufioreq_evtchn);
     if (rc < 0) {
         fprintf(stderr, "failed to get HVM_PARAM_BUFIOREQ_EVTCHN\n");
         return -1;
     }
     rc = xc_evtchn_bind_interdomain(state->xce_handle, xen_domid,
-            (uint32_t)bufioreq_evtchn);
+                                    (uint32_t)bufioreq_evtchn);
     if (rc == -1) {
         fprintf(stderr, "bind interdomain ioctl error %d\n", errno);
         return -1;
@@ -1189,14 +1194,19 @@ int xen_hvm_init(void)
         exit(1);
     }
 
-    // Since this is in a stubdom, there is no needed to setup the backend 
-    // devices. 
+    // Since this is in a stubdom, there is no needed to setup the backend
+    // devices.
 #if 0
     xen_be_register("console", &xen_console_ops);
     xen_be_register("vkbd", &xen_kbdmouse_ops);
     xen_be_register("qdisk", &xen_blkdev_ops);
 #endif
 
+#ifdef CONFIG_XEN_ISO_CHANGE
+    if (0 > xenstore_init_iso_dev()) {
+        fprintf(stderr, "%s: failed to initialize iso media changes, not fatal\n", __FUNCTION__);
+    }
+#endif
     xen_read_physmap(state);
 
     return 0;
@@ -1238,7 +1248,7 @@ void destroy_hvm_domain(bool reboot)
 static void __xen_create_framebuffer_mapping(void)
 {
     size_t number_of_pfns_to_map;
-    xen_pfn_t * pfns_to_map;
+    xen_pfn_t *pfns_to_map;
     hwaddr vram_gmfn;
     int i;
 
@@ -1252,26 +1262,26 @@ static void __xen_create_framebuffer_mapping(void)
     //we'll use this list to map the framebuffer into our memory space.
     pfns_to_map = malloc(sizeof(*pfns_to_map) * number_of_pfns_to_map);
     for(i = 0; i < number_of_pfns_to_map; ++i) {
-      pfns_to_map[i] =  vram_gmfn + i;
+        pfns_to_map[i] =  vram_gmfn + i;
     }
 
     //Ask the hypervisor to perform the actual mapping, ensuring that we map
     //the memory with write-combine caching. This ensures that any changes we
-    //make to the framebuffer are "immediately" applied to the VRAM (and thus 
+    //make to the framebuffer are "immediately" applied to the VRAM (and thus
     //to the display), rather than sitting in a CPU cache until eviction.
     framebuffer_mapped = xc_map_foreign_batch_cacheattr(xen_xc, xen_domid,
-                                                        PROT_READ | PROT_WRITE,
-                                                        pfns_to_map,
-                                                        number_of_pfns_to_map,
-                                                        XC_MAP_CACHEATTR_WC);
+                         PROT_READ | PROT_WRITE,
+                         pfns_to_map,
+                         number_of_pfns_to_map,
+                         XC_MAP_CACHEATTR_WC);
     free(pfns_to_map);
 }
 
 /**
  * Register a given guest memory region as a VRAM LFB (linear framebuffer).
- * This allows us to "pass" this memory directly to Surfman, the XenClient 
+ * This allows us to "pass" this memory directly to Surfman, the XenClient
  * display multiplexer, which can map the region for zero-copy multiplexing.
- */ 
+ */
 void xen_register_framebuffer(MemoryRegion *mr)
 {
     //Store the fram
@@ -1282,13 +1292,13 @@ void xen_register_framebuffer(MemoryRegion *mr)
 /**
  * Returns a MemoryRegion object descrbing the guest's video memory.
  *
- * WARNING: 
+ * WARNING:
  *  Consider this a "read-only" reference to the guest's memory; it should
  *  not be used to generate references used to write into the guest's VRAM,
  *  as references generated accordingly will not have the correct cache
  *  attributes. For a reference that can be used to write to guest memory,
  *  use xen_get_framebuffer_ptr().
- */ 
+ */
 MemoryRegion *xen_get_framebuffer(void)
 {
     return framebuffer;
@@ -1305,7 +1315,7 @@ MemoryRegion *xen_get_framebuffer(void)
  *
  * @return A QEMU-accessible pointer to the Xen guest's framebuffer.
  */
-void * xen_get_framebuffer_ptr(void)
+void *xen_get_framebuffer_ptr(void)
 {
     return framebuffer_mapped;
 }
@@ -1333,7 +1343,7 @@ void xen_modified_memory(ram_addr_t start, ram_addr_t length)
         }
         start_pfn = start >> TARGET_PAGE_BITS;
         nb_pages = ((start + length + TARGET_PAGE_SIZE - 1) >> TARGET_PAGE_BITS)
-            - start_pfn;
+                   - start_pfn;
         rc = xc_hvm_modified_memory(xen_xc, xen_domid, start_pfn, nb_pages);
         if (rc) {
             fprintf(stderr,

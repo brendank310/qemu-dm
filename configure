@@ -230,6 +230,8 @@ surfman="no"
 virtio_blk_data_plane=""
 atapipt="no"
 atapiptv4v="no"
+oxtiso="no"
+stubdom="no"
 xenpt_hide_msix="yes"
 
 # parse CC options first
@@ -905,6 +907,14 @@ for opt do
   --enable-atapi-pt-v4v) atapiptv4v="yes" && atapipt="yes"
   ;;
   --disable-atapi-pt-v4v) atapiptv4v="no"
+  ;;
+  --enable-openxt-iso) oxtiso="yes"
+  ;;
+  --disable-openxt-iso) oxtiso="no"
+  ;;
+  --enable-openxt-stubdom) stubdom="yes"
+  ;;
+  --disable-openxt-stubdom) stubdom="no"
   ;;
   --disable-glusterfs) glusterfs="no"
   ;;
@@ -3404,6 +3414,8 @@ echo "gcov              $gcov_tool"
 echo "gcov enabled      $gcov"
 echo "ATAPI PT support  $atapipt"
 echo "ATAPI PT V4V support  $atapiptv4v"
+echo "OpenXT ISO CDROM  $oxtiso"
+echo "OpenXT Stubdomain support   $stubdom"
 
 if test "$sdl_too_old" = "yes"; then
 echo "-> Your SDL version is too old - please upgrade to have SDL support"
@@ -3765,6 +3777,14 @@ fi
 
 if test "$atapiptv4v" = "yes" ; then
   echo "CONFIG_ATAPI_PT_V4V=y" >> $config_host_mak
+fi
+
+if test "$oxtiso" = "yes" ; then
+  echo "CONFIG_XEN_ISO_CHANGE=y" >> $config_host_mak
+fi
+
+if test "$stubdom" = "yes" ; then
+  echo "CONFIG_STUBDOM=y" >> $config_host_mak
 fi
 
 if test "$virtio_blk_data_plane" = "yes" ; then
